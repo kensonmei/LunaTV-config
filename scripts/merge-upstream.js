@@ -1,10 +1,9 @@
-// Merge upstream jingjian.json with our custom extra sources
+// Merge upstream jingjian.json with custom extras, split regular vs adult
 // Run: node scripts/merge-upstream.js
 // Requires: upstream.json (fetched from hafrey1/LunaTV-config)
 
 const fs = require('fs');
 
-// Our 17 custom extra sources (not in upstream jingjian.json)
 const CUSTOM_EXTRAS = {
   "dbzy":       { "name": "🎬豆瓣资源", "api": "https://caiji.dbzy5.com/api.php/provide/vod", "detail": "https://dbzy.tv" },
   "lzizy":      { "name": "🎬量子影视", "api": "https://cj.lziapi.com/api.php/provide/vod", "detail": "https://lzizy.net" },
@@ -25,20 +24,16 @@ const CUSTOM_EXTRAS = {
   "siwazy":     { "name": "🔞丝袜资源", "api": "https://api.siwazy.com/api.php/provide/vod", "detail": "https://siwazy.com" },
 };
 
-// Base58 alphabet
 const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function base58Encode(str) {
   const bytes = Buffer.from(str, 'utf-8');
   let n = 0n;
-  for (const b of bytes) {
-    n = (n << 8n) | BigInt(b);
-  }
+  for (const b of bytes) n = (n << 8n) | BigInt(b);
   if (n === 0n) return BASE58[0];
   let result = '';
   while (n > 0n) {
-    const r = Number(n % 58n);
-    result = BASE58[r] + result;
+    result = BASE58[Number(n % 58n)] + result;
     n = n / 58n;
   }
   return result;
@@ -48,42 +43,45 @@ function normUrl(url) {
   return url.toLowerCase().replace(/\/+$/, '');
 }
 
+function writeConfigs(sites, prefix) {
+  const config = { cache_time: 7200, api_site: sites };
+  fs.writeFileSync(`${prefix}.json`, JSON.stringify(config, null, 2), 'utf-8');
+  fs.writeFileSync(`${prefix}.txt`, base58Encode(JSON.stringify(config)), 'utf-8');
+}
+
 // Load upstream
 const upstream = JSON.parse(fs.readFileSync('upstream.json', 'utf-8'));
 const upstreamSites = upstream.api_site || {};
 
-// Build merged: upstream as base, custom extras added
-const merged = {};
-let normalCount = 0, adultCount = 0;
-
-// Add upstream first
+const regular = {}, adult = {};
+let upNormal = 0, upAdult = 0;
 for (const [key, val] of Object.entries(upstreamSites)) {
-  merged[key] = val;
-  if (val.name.startsWith('🎬')) normalCount++;
-  else if (val.name.startsWith('🔞')) adultCount++;
+  if (val.name.startsWith('🔞')) { adult[key] = val; upAdult++; }
+  else { regular[key] = val; upNormal++; }
 }
 
-// Add custom extras (skip if API already exists)
-const existingApis = new Set(Object.values(merged).map(s => normUrl(s.api)));
-let addedCount = 0;
+// Add custom extras (skip if API already exists in same category)
+const existingRegular = new Set(Object.values(regular).map(s => normUrl(s.api)));
+const existingAdult = new Set(Object.values(adult).map(s => normUrl(s.api)));
+let addedRegular = 0, addedAdult = 0;
+
 for (const [key, val] of Object.entries(CUSTOM_EXTRAS)) {
-  if (!existingApis.has(normUrl(val.api))) {
-    merged[key] = val;
-    existingApis.add(normUrl(val.api));
-    addedCount++;
-    if (val.name.startsWith('🎬')) normalCount++;
-    else if (val.name.startsWith('🔞')) adultCount++;
+  const isAdult = val.name.startsWith('🔞');
+  if (isAdult && !existingAdult.has(normUrl(val.api))) {
+    adult[key] = val;
+    existingAdult.add(normUrl(val.api));
+    addedAdult++;
+  } else if (!isAdult && !existingRegular.has(normUrl(val.api))) {
+    regular[key] = val;
+    existingRegular.add(normUrl(val.api));
+    addedRegular++;
   }
 }
 
-// Write jingjian.json
-const config = { cache_time: 7200, api_site: merged };
-fs.writeFileSync('jingjian.json', JSON.stringify(config, null, 2), 'utf-8');
+writeConfigs(regular, 'jingjian');
+writeConfigs(adult, 'jingjian-adult');
 
-// Write jingjian.txt (base58 encoded, compact JSON)
-const compact = JSON.stringify(config);
-fs.writeFileSync('jingjian.txt', base58Encode(compact), 'utf-8');
-
-console.log(`Upstream: ${Object.keys(upstreamSites).length} sources`);
-console.log(`Custom extras added: ${addedCount}`);
-console.log(`Merged: ${Object.keys(merged).length} (${normalCount} normal + ${adultCount} adult)`);
+console.log(`Upstream: ${upNormal} regular + ${upAdult} adult`);
+console.log(`Custom added: ${addedRegular} regular + ${addedAdult} adult`);
+console.log(`Output jingjian: ${Object.keys(regular).length} regular sources (NO adult)`);
+console.log(`Output jingjian-adult: ${Object.keys(adult).length} adult sources`);
