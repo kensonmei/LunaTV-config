@@ -31,11 +31,6 @@
       "api": "https://apilsbzy1.com/api.php/provide/vod",
       "detail": "https://apilsbzy1.com"
     },
-    "www.yytv4.cc": {
-      "name": "🔞优优资源",
-      "api": "https://www.yytv4.cc/api.php/provide/vod",
-      "detail": "https://www.yytv4.cc"
-    },
     "xiaojizy.live": {
       "name": "🔞小鸡资源",
       "api": "https://api.xiaojizy.live/provide/vod",
@@ -73,7 +68,7 @@
     },
     "apilj.com": {
       "name": "🔞辣椒资源",
-      "api": "https://pz.v88.qzz.io/?url=https://apilj.com/api.php/provide/vod",
+      "api": "https://apilj.com/api.php/provide/vod",
       "detail": "https://apilj.com"
     },
     "shayuapi.com": {
